@@ -1,11 +1,45 @@
 var AnimationLayer = cc.Layer.extend({
     enemyGenerators: [],
+    enemies: [],
     space: null,
-
+    player: null,
+    step: 0,
     ctor:function (space) {
         this._super();
+        this.enemyGenerators = [];
+        this.enemies = [];
         this.space = space;
+        this.player = new PJ(this.space);
+        this.addChild(this.player.sprite);
         this.init();
+        cc.eventManager.addListener({
+            event: cc.EventListener.KEYBOARD,
+            onKeyPressed:  function(keyCode, event){
+                var layer = event.getCurrentTarget();
+                switch (keyCode){
+                    case 87:
+                        layer.player.move("up")
+                        break;
+                    case 65:
+                        layer.player.move("down")
+                        break;
+                    case 83:
+                        layer.player.move("down")
+                        break;
+                    case 68:
+                        layer.player.move("up")
+                        break;
+                    case 16:
+                        layer.player.changeWeapon();
+                        break;
+                    case 32:
+                        layer.player.shoot();
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }, this);
     },
     update:function(){
         this.enemyGenerators.forEach(function(gen){
@@ -13,82 +47,56 @@ var AnimationLayer = cc.Layer.extend({
                 enemy.move();
             })
         })
+        this.step++;
+        if (this.step == 200){
+            this.step = 0;
+            for (var i = 0; i<this.enemyGenerators.length; i++) {
+                if (Math.random() > 0.25){
+                    var e = this.enemyGenerators[i].spawn();
+                    this.addChild(e.sprite);
+                }
+            }
+        }
     },
     init:function (){
         this._super();
         var size = cc.winSize;
-        var spritePJ = new cc.Sprite(res.pj_img);
-        spritePJ.attr({x:300, y:30});
 
-        var spriteEnemy = new cc.Sprite(res.g1_img);
-        spriteEnemy.attr({x:200, y:20});
 
-        var bar = new cc.Sprite(res.bar_img);
-        bar.attr({
-            x: (size.width / 2) + 15,
-            y: (size.height/2) - 147,
-            rotation: 337
-        });
+//Start enemy generation
+        //POLISH!!!!
+        this.enemyGenerators.push(new EnemyGenerator(150, 250, this.space));
+        this.enemyGenerators.push(new EnemyGenerator(150, 400, this.space));
+        this.enemyGenerators.push(new EnemyGenerator(200, 500, this.space));
+        this.enemyGenerators.push(new EnemyGenerator(250, 600, this.space));
+        //this.enemyGenerators.push(new EnemyGenerator(300, 600, this.space));
 
+
+        for (var i = 0; i<this.enemyGenerators.length; i++) {
+            if (Math.random() > 0.25) {
+                var e = this.enemyGenerators[i].spawn();
+                this.addChild(e.sprite);
+            }
+        }
+
+
+        //Adding the bar
+        var bar = new cc.PhysicsSprite(res.bar_img);
         var contentSize = bar.getContentSize();
-        var barBody = new cp.Body(1, cp.momentForBox(contentSize.width, contentSize.height));
-        barBody.p = cc.p((size.width / 2) + 15, (size.height/2) - 147);
-        this.space.addBody(this.body);
-        var shape = new cp.BoxShape(body, contentSize.width, contentSize.height);
-        this.space.addShape(this.shape);
-        bar.setBody(body);
+        var barBody = new cp.StaticBody();
+        barBody.setPos(cc.p((size.width / 2)+1,(size.height/2)));
+        bar.setBody(barBody);
+        var v = [300,-28,248,-11,-35,-250,50,-250];
+        cp.convexHull(v);
+        var barShape = new cp.PolyShape(barBody, v, cp.v(0,0));
+        //var barShape = new cp.BoxShape(barBody, 300, 80);
+        barShape.setCollisionType(SpriteTag.bar);
+        barShape.group = 1;
+        this.space.addStaticShape(barShape);
 
         this.addChild(bar);
-
-        this.enemyGenerators.push(new EnemyGenerator(100, 400));
-        this.enemyGenerators[0].spawn();
-        this.addChild(this.enemyGenerators[0].enemies[0].sprite);
-
-
+        //end bar
 
     }
 });
 
-var EnemyGenerator = function(posX, posY) {
-    this.enemies = [];
-    this.position = {
-        x: posX,
-        y: posY
-    };
-};
-
-EnemyGenerator.prototype.spawn = function(){
-    var enemyType = getRandomInt(0, 3);
-    this.enemies.push(new Enemy(enemyType, this.position));
-};
-
-//TODO
-//Add sprites depending of type
-//Animation controller etc
-var Enemy = function(enemyType, position){
-    switch (enemyType) {
-        case 0:
-            this.hunger = 5;
-            break;
-        case 1:
-            this.hunger = 15;
-            break;
-        case 2:
-            this.hunger = 30;
-            break;
-        default:
-            this.hunger = Math.random()*10;
-            break;
-    }
-    this.sprite = new cc.Sprite(res.g1_img);
-    this.sprite.attr({x : position.x, y: position.y});
-};
-
-Enemy.prototype.move = function(){
-    var actionMove = new cc.MoveBy(1, cc.p(1,-1));
-    this.sprite.runAction(new cc.Sequence(actionMove));
-};
-
-function getRandomInt(min, max) {
-    return Math.floor(Math.random() * (max - min)) + min;
-}
